@@ -38,7 +38,7 @@ Parallel groups in brackets; sequential otherwise.
 - `FetchResult = { kind: "html" | "rss" | "youtube-video" | "youtube-channel" | "unknown"; content: string; metadata?: Record<string, any> }`
 - Dispatch:
   - YouTube watch URL → uses `youtube-captions` → `kind: "youtube-video"`, content is `JSON.stringify(chunks)`
-  - YouTube channel URL (handle or channel-id) → rewrite to Atom feed; return `kind: "youtube-channel"` with feed XML
+  - YouTube channel URL: for `?channel_id=UC...` patterns rewrite directly to Atom feed. For `@handle` URLs, fetch the channel HTML and extract the canonical `UC...` ID (from `<link rel="canonical">` or `og:url`), then rewrite. **(Note: current v2 `feed-discover.ts` uses `?user=<handle>` which YouTube no longer supports — verified 404 against `@DwarkeshPatel`.)** Returns `kind: "youtube-channel"` with feed XML.
   - URL with feed-shape (`.xml`, `.rss`, `/feed`, `/rss`) → `kind: "rss"` with feed XML
   - Anything else → `kind: "html"` (or `"unknown"` on non-2xx)
 - Mocked-fetch tests for each dispatch branch
