@@ -24,7 +24,7 @@ app.get("/", (_req, res) => res.redirect(`/brief/${todayStr()}`));
 
 app.get("/brief/:date", async (req, res) => {
   try {
-    const page = await getPage(`briefs/${req.params.date}`);
+    const page = await getPage(`personal-rss/daily/${req.params.date}`);
     if (!page) return res.status(404).send(render(`<p>No brief for ${req.params.date}.</p>`, req.params.date));
     res.send(render(marked.parse(page.body) as string, req.params.date));
   } catch (e: any) {
@@ -34,8 +34,8 @@ app.get("/brief/:date", async (req, res) => {
 
 app.get("/briefs", async (_req, res) => {
   try {
-    const slugs = await listPages("briefs/");
-    const dates = slugs.map(s => s.replace(/^briefs\//, "")).sort().reverse();
+    const slugs = await listPages("personal-rss/daily/");
+    const dates = slugs.map(s => s.replace(/^personal-rss\/daily\//, "")).sort().reverse();
     const list = dates.map(d => `<li><a href="/brief/${d}">${d}</a></li>`).join("");
     res.send(render(`<h1>Briefs</h1><ul>${list || "<li><em>none yet</em></li>"}</ul>`, "index"));
   } catch (e: any) {
