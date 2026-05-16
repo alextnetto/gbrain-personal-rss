@@ -1,0 +1,6 @@
+{
+  "name": "gbrain-personal-rss",
+  "version": "0.1.0",
+  "plugin_version": "gbrain-plugin-v1",
+  "description": "Personal AI-filtered content brief — RSS ingestion + daily digest subagents"
+}
