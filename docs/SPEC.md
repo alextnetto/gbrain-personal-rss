@@ -1,3 +1,5 @@
+> **Architecture has pivoted.** See [`docs/PROCESSING.md`](./PROCESSING.md) for the current v2 (Obsidian-native) design. The Scope + storyboard (§1), Brief composition (§3), and Failure modes (§4) below remain valid; §2 Architecture is superseded.
+
 # `gbrain-personal-rss` — Implementation Spec
 
 **Status:** Draft v1 · 2026-05-16 · YC Hackathon
