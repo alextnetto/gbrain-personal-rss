@@ -56,8 +56,8 @@ cat > "$PLIST_PATH" <<EOF
 EOF
 echo "  wrote $PLIST_PATH (load with: launchctl load $PLIST_PATH)"
 
-echo "==> running smoke test"
-bash "$REPO_ROOT/scripts/smoke.sh"
+echo "==> running typecheck + tests"
+(cd "$REPO_ROOT" && bun --bun tsc --noEmit && bun test)
 
 echo "==> done. next steps:"
 echo "  • source $GBRAIN_RC in your shell to pick up GBRAIN_PLUGIN_PATH"
