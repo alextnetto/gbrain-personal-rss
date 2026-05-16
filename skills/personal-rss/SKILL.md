@@ -1,61 +1,48 @@
 ---
 name: personal-rss
-description: Use when the user wants to manage RSS subscriptions (podcasts, blogs, YouTube channels, papers), update their interests file, or read today's or past daily content briefs.
+description: Use when the user wants to add a source to follow, save a one-off URL for later (inbox), update their interests, read today's or a past daily content brief, or list current subscriptions.
 ---
 
 # Personal RSS
 
-This skill teaches you how to operate the personal-rss system using gBrain's existing operations. There are no custom tools — use `put_page`, `list_pages`, `get_page`.
+This skill teaches you how to operate the personal-rss system using gBrain's existing operations. There are no custom tools — you use `put_page`, `list_pages`, `get_page`.
 
-## Conventions
-- Subscriptions live at `subscriptions/<slug>.md`. Slug is kebab-case from the source title.
-- Items live at `items/<source-slug>/<item-id>.md` (managed by the orchestrator — you don't touch these).
-- Daily briefs live at `briefs/<YYYY-MM-DD>.md`.
-- The user's interests live at `interests.md` (single page, free-text).
+## Where things live (all under `personal-rss/`)
 
-## Add a subscription
+| Page | Purpose |
+|---|---|
+| `personal-rss/interests.md` | the user's free-text taste model |
+| `personal-rss/following.md` | subscriptions, one per line: `<url> - <description>` |
+| `personal-rss/inbox.md` | one-off URLs to read soon; auto-cleared after each brief |
+| `personal-rss/seen.md` | dedup log (machine-managed; user can edit to force re-process) |
+| `personal-rss/daily/<YYYY-MM-DD>.md` | the brief |
 
-1. If the user gave a site URL but not a feed URL, try common patterns:
-   - YouTube channel → `https://www.youtube.com/feeds/videos.xml?channel_id=<ID>`
-   - Substack → `<root>/feed`
-   - Most blogs → look for an RSS link in the page source; otherwise ask
-2. Derive a kebab-case slug from the source title.
-3. Call `put_page` to write `subscriptions/<slug>.md` with frontmatter:
-   ```yaml
-   feed_url: <feed_url>
-   content_type_hint: auto
-   added_at: <ISO now>
-   last_fetched_at: null
-   etag: null
-   ```
-   Body: a one-sentence note from the user about what the source is.
-4. Tell the user it's added. The next nightly run will pick it up; don't trigger ingest immediately unless they ask.
+## The six actions
 
-## Show today's brief
+### 1. Add a source
+Append a single line to `personal-rss/following.md`:
+```
+<url> - <free-text description of what's interesting about this source>
+```
+If the user gave a site URL but not a feed URL, append the site URL — the orchestrator auto-discovers feeds.
+Get the description from the user; don't invent one.
 
-1. Compute today's date (YYYY-MM-DD, local TZ).
-2. Call `get_page("briefs/<date>")`.
-3. If it exists, return it inline — do NOT summarize, the brief itself is the artifact they want.
-4. If it doesn't exist: tell them, and ask if they want you to trigger one. To trigger, instruct them to run `bun run daily` from the repo (you cannot trigger the orchestrator yourself — it must run with library access).
+### 2. Save a one-off URL for later (inbox)
+Append the URL on its own line to `personal-rss/inbox.md`. No description needed. Tell the user it'll appear in the next brief.
 
-## Show a past brief
+### 3. Show today's brief
+Compute today's date (YYYY-MM-DD, local TZ). Call `get_page("personal-rss/daily/<date>")`. If it exists, return it inline — do NOT summarize. If it doesn't exist, tell the user no brief has been generated yet and that they can run `bun run daily` from the project root.
 
-1. Parse the date they mention ("last Tuesday", "March 12") into YYYY-MM-DD.
-2. Call `get_page("briefs/<date>")`.
-3. If missing, tell them no brief exists for that date.
+### 4. Show a past brief
+Parse the date the user mentioned ("last Tuesday", "March 12") into YYYY-MM-DD. Call `get_page("personal-rss/daily/<date>")`. If missing, tell them.
 
-## Update interests
+### 5. Update interests
+Call `get_page("personal-rss/interests")`, apply the user's edit, write back with `put_page("personal-rss/interests", <new body>)`. Note: the next daily run will re-score against the new interests.
 
-1. Call `get_page("interests")` to read the current body.
-2. Apply the user's edit.
-3. Call `put_page("interests", <new body>)`.
-4. Note that the next nightly run re-scores against the new interests.
-
-## List subscriptions
-
-Call `list_pages({ prefix: "subscriptions/" })` and render with feed_url and added_at.
+### 6. List subscriptions
+Call `get_page("personal-rss/following")` and render the lines for the user.
 
 ## Don't
-- Don't invent items or briefs. If a page doesn't exist, say so.
-- Don't modify item pages (`items/**`) — the orchestrator owns them.
-- Don't write brief markdown yourself — `compose-brief` (a separate subagent invoked by the orchestrator) does this.
+- Don't invent URLs or item content. If a page doesn't exist, say so.
+- Don't modify item pages under `media/articles/` or `media/podcasts/` — those are owned by the orchestrator.
+- Don't write briefs yourself — `compose-brief` (a subagent invoked by the nightly orchestrator) does this.
