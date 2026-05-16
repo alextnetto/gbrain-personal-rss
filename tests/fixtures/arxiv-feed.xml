@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>arXiv cs.AI new submissions</title>
+  <entry>
+    <id>http://arxiv.org/abs/2601.00001v1</id>
+    <title>A Paper Title</title>
+    <link href="http://arxiv.org/abs/2601.00001v1" />
+    <summary>Abstract text.</summary>
+  </entry>
+</feed>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Example Blog</title>
+  <item>
+    <title>A Post</title>
+    <link>https://example.com/posts/a-post</link>
+    <description>A short summary of the post.</description>
+  </item>
+</channel></rss>
