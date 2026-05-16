@@ -62,7 +62,8 @@
 | HTML pages (blogs, news, Substack posts) | `fetch(url)` → raw HTML | `ingest` reasons about the body | works |
 | RSS/Atom feeds (any) | parse to items; iterate | per-item routing | works |
 | Substack newsletter root | rewrite to `<root>/feed` → HTML per post | same as HTML | works |
-| YouTube channels | rewrite `/@handle` → Atom feed → per-video captions XML | `ingest` reasons about chunks, picks key segments | works |
+| YouTube channels (`?channel_id=UC...` form) | rewrite to Atom feed → per-video captions XML | `ingest` reasons about chunks, picks key segments | works |
+| YouTube channels (`@handle` form) | needs channel-page HTML scrape for canonical `UC...` ID; current code's `?user=<handle>` rewrite is **verified 404** | (same once feed resolves) | broken — needs fix |
 | YouTube individual videos | fetch captions XML, parse chunks | same | works |
 | arXiv (Atom feed) | parse feed; `ingest` on each abstract | text path | partial — full-PDF roadmap |
 | **One-off URLs** (`inbox.md`) | same dispatch as above | `ingest` + always included in brief | works |
