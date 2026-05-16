@@ -10,6 +10,17 @@ echo "==> smoke: typecheck"
 echo "==> smoke: unit tests"
 (cd "$REPO_ROOT" && bun test)
 
+echo "==> smoke: parse-following + feed-discover sanity"
+(cd "$REPO_ROOT" && bun -e '
+  import { parseFollowing } from "./scripts/parse-following";
+  import { discoverFeedFromUrl } from "./scripts/feed-discover";
+  const f = parseFollowing("https://a.example - aaa\nhttps://b.example - bbb");
+  if (f.length !== 2) { console.error("parseFollowing wrong length"); process.exit(2); }
+  const yt = discoverFeedFromUrl("https://www.youtube.com/@DwarkeshPatel");
+  if (!yt?.includes("feeds/videos.xml")) { console.error("discover wrong"); process.exit(2); }
+  console.log("ok");
+')
+
 echo "==> smoke: gbrain library importable"
 if (cd "$REPO_ROOT" && bun -e "import('gbrain/engine-factory').then(()=>console.log('ok'))" 2>/dev/null | grep -q "ok"); then
   echo "  ok"
