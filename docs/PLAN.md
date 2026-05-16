@@ -1,136 +1,160 @@
-# v2 Plan
+# v2 Plan (minimal happy-path)
 
-> Implements `docs/SPEC.md`. Supersedes prior plans (in git history).
-
-**Goal of this pivot:** collapse the current per-step subagents (`score-item`) and hardcoded extractors (`extract-text`, `content-type-detect`) into a single polymorphic `ingest` subagent that handles any URL end-to-end. The orchestrator stays thin and grows only by source-protocol.
+Collapses the prior multi-subagent pipeline into one subagent + one fetch loop. 5 tasks, ~30 min.
 
 ---
 
-## Delta from current code
+## Files
 
-| Change | What |
-|---|---|
-| **Delete** | `subagents/score-item.md` · `scripts/extract-text.ts` · `scripts/content-type-detect.ts` · `tests/content-type-detect.test.ts` · `docs/PROCESSING.md` |
-| **Add** | `subagents/ingest.md` (polymorphic) · `scripts/fetch-content.ts` + tests · `scripts/youtube-captions.ts` + tests |
-| **Modify** | `src/orchestrator/pipeline.ts` (rewrite per-item flow) · `subagents/compose-brief.md` (add inbox section) · `src/types.ts` (add `FetchResult`, `IngestResult`; remove `ScoreResult`) |
-| **Untouched** | `src/orchestrator/brain.ts` · `subagents/resurface-archive.md` · `scripts/parse-following.ts` · `scripts/feed-discover.ts` · `scripts/fetch-rss.ts` · `bin/` · `web/` · `install.sh` · `gbrain.plugin.json` |
+**Delete:**
+- `subagents/score-item.md`
+- `subagents/resurface-archive.md`
+- `subagents/compose-brief.md`
+- `scripts/content-type-detect.ts` + test + 4 fixtures
+- `scripts/feed-discover.ts` + test
+- `scripts/parse-following.ts` + test  *(inline 3-liner instead)*
+- `scripts/extract-text.ts`  *(orchestrator inlines)*
+- `scripts/smoke.sh`  *(no-op now)*
+
+**Add:**
+- `subagents/brief.md` — single subagent that writes the brief
+
+**Modify:**
+- `src/orchestrator/pipeline.ts` — full rewrite, target ~80 lines
+- `src/types.ts` — drop unused types; keep only what `pipeline.ts` needs
+- `skills/personal-rss/SKILL.md` — 4 actions only
+
+**Untouched:**
+- `src/orchestrator/brain.ts`
+- `scripts/fetch-rss.ts` (we still use `fetchAndParse` + `parseRssItems`)
+- `bin/personal-rss-daily(.ts)`
+- `web/` (still reads briefs from `personal-rss/daily/`)
+- `gbrain.plugin.json`
+- `install.sh`
 
 ---
 
 ## Tasks
 
-Parallel groups in brackets; sequential otherwise.
+### T1 — Delete dead files
 
-### T1 — Add `scripts/youtube-captions.ts` (TDD)
-
-**Files:** `scripts/youtube-captions.ts`, `tests/youtube-captions.test.ts`, `tests/fixtures/youtube-watch-page.html`, `tests/fixtures/youtube-captions.xml`
-
-- `parseCaptionsXml(xml)` → `[{start, end, text}]`
-- `extractCaptionTrackUrl(watchPageHtml)` → `string | null` (pulls `captionTracks[0].baseUrl` from `ytInitialPlayerResponse`)
-- `fetchYouTubeTranscript(watchUrl)` → composed: fetch watch page, extract caption URL, fetch XML, parse chunks
-- Three fixture-driven tests for the pure functions
-
-### T2 — Add `scripts/fetch-content.ts` (TDD)
-
-**Files:** `scripts/fetch-content.ts`, `tests/fetch-content.test.ts`
-
-- Exports `fetchContent(url): Promise<FetchResult>`
-- `FetchResult = { kind: "html" | "rss" | "youtube-video" | "youtube-channel" | "unknown"; content: string; metadata?: Record<string, any> }`
-- Dispatch:
-  - YouTube watch URL → uses `youtube-captions` → `kind: "youtube-video"`, content is `JSON.stringify(chunks)`
-  - YouTube channel URL: for `?channel_id=UC...` patterns rewrite directly to Atom feed. For `@handle` URLs, fetch the channel HTML and extract the canonical `UC...` ID (from `<link rel="canonical">` or `og:url`), then rewrite. **(Note: current v2 `feed-discover.ts` uses `?user=<handle>` which YouTube no longer supports — verified 404 against `@DwarkeshPatel`.)** Returns `kind: "youtube-channel"` with feed XML.
-  - URL with feed-shape (`.xml`, `.rss`, `/feed`, `/rss`) → `kind: "rss"` with feed XML
-  - Anything else → `kind: "html"` (or `"unknown"` on non-2xx)
-- Mocked-fetch tests for each dispatch branch
-
-### T3 — Add `subagents/ingest.md`
-
-Single subagent file. Frontmatter:
-
-```yaml
-name: ingest
-model: claude-sonnet-4-6
-max_turns: 6
-allowed_tools:
-  - brain_get_page
-  - brain_search
+```bash
+git rm subagents/score-item.md subagents/resurface-archive.md subagents/compose-brief.md
+git rm scripts/content-type-detect.ts tests/content-type-detect.test.ts tests/fixtures/*.xml
+git rm scripts/feed-discover.ts tests/feed-discover.test.ts
+git rm scripts/parse-following.ts tests/parse-following.test.ts
+git rm scripts/extract-text.ts scripts/smoke.sh
 ```
 
-Body: short, opinionated prompt that receives `{url, kind, raw_content, metadata, interests, source_description}` and emits:
+Single commit: `"v2 minimal: delete multi-subagent + content-type machinery"`.
 
-```json
-{
-  "kind": "text" | "audio" | "video" | "paper",
-  "title": "...",
-  "summary": "<1–2 sentences>",
-  "score": 0-100,
-  "why_it_matters": "<one sentence, references a stated interest>",
-  "cleaned_text": "<for text items: the article body, no nav/ads/comments>",
-  "key_segments": [{"start": 1394, "end": 2042, "why": "<one sentence>"}]
+### T2 — Add `subagents/brief.md`
+
+Single file. Frontmatter:
+
+```yaml
+name: brief
+model: claude-sonnet-4-6
+max_turns: 4
+allowed_tools: []
+```
+
+Body (full prompt): you receive a list of `items[]` and the user's `interests` (free text). Pick the 4–6 most relevant. For each picked item, emit a markdown block:
+
+```markdown
+## [<title>](<url>) — <N> min read
+<one sentence: why this matters given the interests>
+> <a few sentences quoted from the article>
+```
+
+Header line at top: `# Daily Brief — <date>`. No frontmatter. No archive section. No inbox section. If you cannot find 4 relevant items, surface what you can with a note `_(slim day — only X items met the bar)_`. Output ONLY markdown — no preamble, no JSON, no code fences.
+
+### T3 — Rewrite `src/orchestrator/pipeline.ts`
+
+Target ~80 lines. Single `runDaily()` export. Flow:
+
+```ts
+import { getPage, putPage, invokeSubagent } from "./brain";
+import { fetchAndParse } from "../../scripts/fetch-rss";
+
+const FOLLOWING = "personal-rss/following";
+const INTERESTS = "personal-rss/interests";
+
+function todayStr() { /* YYYY-MM-DD local TZ */ }
+function parseFollowing(src: string) { /* inline: split lines, "url - desc" */ }
+async function fetchHtml(url: string): Promise<string> { /* fetch + return body */ }
+
+export async function runDaily() {
+  const interests = (await getPage(INTERESTS))?.body ?? "";
+  const following = parseFollowing((await getPage(FOLLOWING))?.body ?? "");
+
+  const items: Array<{url, title, source, source_description, body}> = [];
+  for (const sub of following) {
+    try {
+      const feed = await fetchAndParse(sub.url);
+      if (feed.status !== 200) continue;
+      const recent = feed.items.filter(/* last 24h */).slice(0, 10);
+      for (const it of recent) {
+        try {
+          const body = await fetchHtml(it.url);
+          items.push({ url: it.url, title: it.title, source: sub.url, source_description: sub.description, body: body.slice(0, 4000) });
+        } catch (e) { console.warn(`[item ${it.url}] ${e}`); }
+      }
+    } catch (e) { console.warn(`[feed ${sub.url}] ${e}`); }
+  }
+
+  let briefMd: string;
+  try {
+    briefMd = await invokeSubagent({
+      subagent_def: "brief",
+      prompt: `## interests\n${interests}\n\n## date\n${todayStr()}\n\n## items\n${JSON.stringify(items, null, 2)}`,
+      allowed_slug_prefixes: ["personal-rss/"],
+      timeout_ms: 240_000,
+    });
+  } catch (e) {
+    briefMd = `# Daily Brief — ${todayStr()}\n\n_(brief subagent failed: ${e})_\n\n` + items.map(i => `- [${i.title}](${i.url})`).join("\n");
+  }
+
+  await putPage(`personal-rss/daily/${todayStr()}`, {}, briefMd.trim() + "\n");
+  console.log(`[runDaily] wrote personal-rss/daily/${todayStr()} (${items.length} items considered)`);
 }
 ```
 
-Calibration rules (90+ direct match, 70–89 clearly relevant, etc.) preserved from `score-item`. The "extract the actual content from raw HTML" instruction is the new part — LLM reasons from first principles, no regex.
+That's the whole pipeline. No `ItemFrontmatter`, no `BriefFrontmatter`, no `media/` writes, no inbox, no seen.
 
-### T4 — Update `src/types.ts`
+### T4 — Simplify `skills/personal-rss/SKILL.md`
 
-- Add `FetchResult` (matches T2 output)
-- Add `IngestResult` (matches T3 output)
-- Remove `ScoreResult`
-- Keep `ItemFrontmatter`, `BriefFrontmatter`, `ArchiveCandidate`, `FollowingEntry`, `ItemKind`, `TranscriptChunk` unchanged
+4 actions only:
+1. **Add a source** — append `<url> - <description>` line to `personal-rss/following.md`.
+2. **Edit interests** — read/write `personal-rss/interests.md`.
+3. **See today's brief** — `get_page("personal-rss/daily/<today>")`.
+4. **See a past brief** — `get_page("personal-rss/daily/<date>")`.
 
-### T5 — Update `subagents/compose-brief.md`
+No list-subscriptions action (user can open `following.md` in Obsidian). No inbox action.
 
-Add a `## From your inbox` section between "New today" and "From your archive" in the format spec. Inbox items render with `*You saved this on <date>.*` instead of `*Why:*`. Bold-link deep-links with `→`.
+### T5 — Verify + commit + push
 
-### T6 — Rewrite `src/orchestrator/pipeline.ts`
-
-Sequential after T1–T5. Single file, target ~250 lines.
-
-New flow per URL:
-1. `fetchContent(url)` → `FetchResult`
-2. If `kind === "rss"` or `"youtube-channel"`: parse feed, iterate item URLs, recurse on each.
-3. Else: skip if URL is in `seen.md`; invoke `ingest` subagent with `{url, kind, content, metadata, interests, source_description}`.
-4. Parse `IngestResult` from subagent's final message.
-5. Compute `media_slug = "media/articles/<sha1>"` if `result.kind === "text" | "paper"`, else `"media/podcasts/<sha1>"`.
-6. `putPage(media_slug, frontmatter, body)` where body is `cleaned_text` (text items) or `JSON.stringify(chunks)` (audio/video).
-
-After all ingest:
-- Invoke `resurface-archive` (unchanged interface).
-- Invoke `compose-brief` (new prompt expects inbox items separately).
-- Write `personal-rss/daily/<date>.md`.
-- `appendToSeen(urls)` · `removeFromInbox(inboxUrls)`.
-
-### T7 — Delete dead files
-
-- `git rm scripts/extract-text.ts scripts/content-type-detect.ts tests/content-type-detect.test.ts subagents/score-item.md docs/PROCESSING.md`
-
-### T8 — Verify + commit + push
-
-- `bun --bun tsc --noEmit` → clean
-- `bun test` → all pass (existing 19 tests minus the 5 content-type-detect ones = 14, plus T1's ~3 + T2's ~4 = ~21 total)
-- `bash scripts/smoke.sh` → ok
-- Single final commit batching the docs + push
+```bash
+cd gbrain-personal-rss
+bun --bun tsc --noEmit          # clean
+bun test                         # all remaining tests pass (just fetch-rss.test.ts → 4)
+git add -A
+git commit -m "v2 minimal: one-subagent pipeline, one fetch loop"
+git push
+```
 
 ---
 
 ## Dependency graph
 
 ```
-[T1, T2, T3, T4, T5, T7] ──→ T6 ──→ T8
+[T1, T2, T4] ──→ T3 ──→ T5
 ```
 
-T1, T2, T3, T4, T5, T7 are independent (different files, no shared state). Dispatch in parallel.
-T6 is sequential (rewrites pipeline.ts using new T1–T5 outputs).
-T8 is the final gate.
+T1, T2, T4 are independent file-level changes. T3 (pipeline rewrite) needs T2 (brief subagent exists). T5 is the final gate.
 
 ---
 
 ## Out of scope for this plan
 
-- Whisper transcription for audio podcasts (roadmap)
-- PDF text extraction for full arXiv papers (roadmap)
-- Multi-user / multi-vault
-- `seen.md` pruning
-- Web view path stays at `personal-rss/daily/`; no changes required
-- README updates (current install + usage section still applies)
+Everything in SPEC §"Out of scope". This plan is the demo bar.
