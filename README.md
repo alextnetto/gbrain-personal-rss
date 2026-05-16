@@ -52,6 +52,43 @@ If you're building anything personal-knowledge-shaped, read [gBrain](https://git
 
 [^1]: Marked as the design target. This is what the hackathon build is aiming at end-to-end; not all five legs are wired up yet.
 
+## Install
+
+Requires [gBrain](https://github.com/garrytan/gbrain) v0.35.1.0+ cloned + bun-linked, and Bun ≥ 1.3.10.
+
+```bash
+# gBrain side (if not already)
+git clone https://github.com/garrytan/gbrain && cd gbrain && bun install && bun link
+
+# this side
+git clone https://github.com/alextnetto/gbrain-personal-rss
+cd gbrain-personal-rss
+./install.sh /path/to/your/gbrain
+```
+
+The installer:
+- `bun link gbrain` so the orchestrator can `import { … } from 'gbrain'`
+- symlinks our skill into your gBrain checkout
+- registers the plugin via `GBRAIN_PLUGIN_PATH` (writes to `~/.gbrainrc`)
+- generates a launchd plist (macOS) for nightly runs
+- runs `scripts/smoke.sh`
+
+## Usage
+
+**In Claude Desktop** (with gBrain's MCP server connected):
+
+- "Add this YouTube channel to my feed: https://www.youtube.com/@AnthropicAI"
+- "What should I read today?"
+- "Show me last Tuesday's brief"
+- "I'm also into WebAssembly toolchains now, update my interests"
+- "List my current subscriptions"
+
+**Manual brief run:** `bun run daily` (or the launchd plist runs `bin/personal-rss-daily` at 6 AM local).
+
+**Web view:** `bun run web`, then visit http://127.0.0.1:7777.
+
+Briefs are written to `briefs/<YYYY-MM-DD>.md` inside your brain.
+
 ## Roadmap
 
 ### Hackathon (May 2026)
