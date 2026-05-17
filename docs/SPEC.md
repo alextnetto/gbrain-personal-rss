@@ -36,7 +36,9 @@ That's the entire surface.
 6. Clear from inbox.md every URL that successfully fetched (unless backfill mode)
 ```
 
-One script. Top-to-bottom. No queue, no DB, no plugin, no MCP, no worker.
+One script. Top-to-bottom. No queue, no DB, no worker.
+
+(Optional: a [gBrain](https://github.com/garrytan/gbrain) skill is shipped at `skills/personal-rss/SKILL.md`. Install it with `./install.sh /path/to/gbrain` and connect gBrain's MCP server to your IDE / Claude Desktop. Then "what should I read today?" reads `personal-rss/daily/<today>` and "save this URL for later" appends to `personal-rss/inbox`. The script itself doesn't depend on gBrain — the skill is a separate delivery surface.)
 
 ---
 
@@ -102,6 +104,6 @@ PERSONAL_RSS_MODEL     anthropic model id (default: claude-sonnet-4-5)
 
 ## Out of scope (intentionally cut)
 
-Archive re-surfacing · seen-log dedup · YouTube transcription · audio podcast transcription · PDF extraction · MCP delivery · gBrain library integration · per-source item persistence · multi-user · web view.
+Archive re-surfacing · YouTube transcription · audio podcast transcription · PDF extraction · gBrain library integration (the script does not import gBrain — only the optional skill talks to gBrain via MCP) · per-source item persistence · multi-user · web view.
 
 Most of these are real features. None are needed for the demo.

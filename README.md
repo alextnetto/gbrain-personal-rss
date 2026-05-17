@@ -38,9 +38,9 @@ One script, ~150 lines:
 4. One Anthropic Claude Sonnet call with the interests + the items + a brief-writer prompt.
 5. Write `personal-rss/daily/<today>.md`.
 
-No queue, no database, no plugin, no MCP server, no inline worker. See [`docs/SPEC.md`](./docs/SPEC.md) for the contract.
+No queue, no database, no inline worker. The script does NOT import gBrain. See [`docs/SPEC.md`](./docs/SPEC.md) for the full contract.
 
-## Install
+## Install (script only)
 
 ```bash
 git clone https://github.com/alextnetto/gbrain-personal-rss
@@ -51,7 +51,18 @@ export PERSONAL_RSS_VAULT=/path/to/your/vault   # contains personal-rss/ folder
 bun run daily
 ```
 
-Requirements: Bun ≥ 1.3.10, an Anthropic API key, a folder with `personal-rss/interests.md` + `personal-rss/following.md`.
+Requirements: Bun ≥ 1.3.10, an Anthropic API key, a folder with `personal-rss/interests.md` + `personal-rss/following.md` + (optional) `personal-rss/inbox.md`.
+
+## Optional — talk to your brief from Claude Desktop / Cursor (via gBrain MCP)
+
+A skill ships at `skills/personal-rss/SKILL.md`. Install it into a [gBrain](https://github.com/garrytan/gbrain) checkout so an MCP client can read briefs, save URLs to your inbox, edit interests, or add feed sources by chatting:
+
+```bash
+./install.sh /path/to/your/gbrain
+# then add gbrain's MCP server to your Claude Desktop / Cursor config
+```
+
+Once wired up, you can ask Claude Desktop *"what should I read today?"* and get the brief back inline, or *"save this URL for later"* and have it land in your inbox before tomorrow's run. The Python-equivalent layer is the gBrain MCP server reading + writing pages by slug; the skill is the prompt that teaches Claude the conventions.
 
 ## Vault layout
 
@@ -59,6 +70,8 @@ Requirements: Bun ≥ 1.3.10, an Anthropic API key, a folder with `personal-rss/
 <your-vault>/personal-rss/
 ├── interests.md         ← free text — what you care about
 ├── following.md         ← one feed per line: <rss-url> - <description>
+├── inbox.md             ← one URL per line; always shown in next brief, then moved to seen.md
+├── seen.md              ← machine-managed: every processed inbox URL with the date
 └── daily/
     └── 2026-05-16.md    ← today's brief (written by the script)
 ```
