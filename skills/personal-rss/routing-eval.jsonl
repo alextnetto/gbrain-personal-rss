@@ -1,5 +1,0 @@
-{"input": "Add this YouTube channel to my feed: https://www.youtube.com/@AnthropicAI", "should_route_to": "personal-rss"}
-{"input": "What should I read today?", "should_route_to": "personal-rss"}
-{"input": "Show me last Tuesday's brief", "should_route_to": "personal-rss"}
-{"input": "I'm now also interested in WebAssembly toolchains, update my interests", "should_route_to": "personal-rss"}
-{"input": "List my current subscriptions", "should_route_to": "personal-rss"}

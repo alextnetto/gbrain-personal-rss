@@ -16,6 +16,10 @@ const parser = new XMLParser({
   attributeNamePrefix: "@_",
   textNodeName: "#text",
   parseAttributeValue: false,
+  // Disable XML entity expansion — Simon Willison's atom feed (and others) hit
+  // the default 1000-entity limit. We don't need entities expanded; the body
+  // text passes through to the LLM regardless.
+  processEntities: false,
 });
 
 const hashId = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 16);

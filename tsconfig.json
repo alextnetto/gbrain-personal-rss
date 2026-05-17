@@ -11,5 +11,6 @@
     "noEmit": true,
     "types": ["bun-types"]
   },
-  "include": ["src/**/*", "scripts/**/*", "web/**/*", "tests/**/*", "bin/**/*"]
+  "include": ["src/**/*", "scripts/**/*", "web/**/*", "tests/**/*", "bin/**/*"],
+  "exclude": ["node_modules", "../gbrain"]
 }

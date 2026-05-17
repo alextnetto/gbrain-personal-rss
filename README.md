@@ -2,127 +2,87 @@
 
 **Your personal content firehose, AI-filtered to what actually matters.**
 
-Status: 🚧 YC Hackathon prototype — May 2026
+Status: 🚧 YC Hackathon (May 2026) — v0.2 shipped, working end-to-end.
 
 ---
 
 ## The problem
 
-A serious reader/listener today juggles 50+ subscriptions across podcasts, newsletters, YouTube, blogs, news sites, and X. That's easily 8+ hours of new material every single day against a real-life budget closer to 45 minutes. The existing tools either summarize *everything* (and flatten the signal), filter only *text* (and ignore the half of your inputs that are audio), or recommend by what's *popular* rather than what's relevant to *you*. Nobody has a cross-source taste model that knows you.
+You subscribe to 50+ podcasts, newsletters, blogs, YouTube channels, news sites. That's 8+ hours of new material every day. You have 45 minutes. Existing tools summarize everything (flattening the signal), filter only text (ignoring half your inputs), or recommend what's popular (instead of what's relevant to *you*). Nobody has a cross-source taste model that knows you.
 
-## What it does
+## What it does (today)
 
-- **Heterogeneous ingest** — one inbox for podcasts, newsletters, blogs, YouTube channels, news sites, and X/Twitter accounts.
-- **Full transcription** — every podcast episode and YouTube upload is transcribed end-to-end, not just title-and-description matched.
-- **AI-filtered daily brief** — an LLM scores each new item against your stated interests and reading history, and only the high-signal stuff makes it to your brief.
-- **Segment-level recommendations** — not "listen to this 2-hour podcast", but "listen to minutes 23–34" or "read paragraphs 4–7 of this article".
-- **Archive re-surfacing** — old saves become new recommendations when they suddenly matter again ("you saved that RAG article in 2024 — it's relevant to today's model release").
-- **Delivered where you already are** — an MCP server makes your brief queryable from ChatGPT, Claude Desktop, or Cursor; a lightweight SPA handles subscriptions and admin.
+Drop URLs in a markdown file. Run one command. Get a brief.
+
+```bash
+$ bun run daily
+[daily] 3 subscriptions
+[daily] 18 articles fetched
+[daily] calling claude-sonnet-4-5...
+[daily] wrote .../personal-rss/daily/2026-05-16.md (3023 chars, 18 items considered)
+```
+
+The brief opens in Obsidian (or any markdown reader). It picks **4–6 items** out of everything fetched, each with a one-line "why this matters given your interests" and a quote from the body.
 
 ## Why now
 
-Whisper-class transcription has dropped to roughly **$0.006 per minute**, and long-context LLMs can score a full podcast transcript in a single call. The economics that would have made this absurd in 2022 — full transcription plus per-item LLM scoring across a 50-source firehose — now land at roughly **$0.30–$1 per user per day** at high-signal subscription levels. The wall is down.
+Whisper-class transcription dropped to ~$0.006/min, and long-context LLMs can score a full feed in one call. The economics that would have made this absurd in 2022 — full transcription plus per-item LLM scoring across a 50-source firehose — now land at roughly **$0.15 per run** for ~20 articles.
 
-## Built on gBrain
+## How it works (v0.2)
 
-This project is a **skillpack + recipes on top of [gBrain](https://github.com/garrytan/gbrain) v0.35.1.0**, not a fork. The contribution is the domain (personal content firehose); the infrastructure is gBrain.
+One script, ~150 lines:
 
-| Capability | gBrain primitive |
-| --- | --- |
-| Podcast + YouTube transcription | `src/core/transcription.ts` |
-| Timestamped chunks for segment-level recs | `src/core/chunkers/` (recursive, semantic, LLM-guided) |
-| Per-user taste filter | `src/core/search/hybrid.ts` — keyword + vector + RRF, intent classification, reranking |
-| Daily scheduled ingest | Postgres-native Minions job queue |
-| Archive re-surfacing | The 9-phase nightly **dream cycle** — synthesize, patterns, emotional-weight, embed, orphans |
-| Delivery surface | gBrain's MCP server (ChatGPT / Claude Desktop / Cursor) + OAuth + admin SPA |
+1. Read `personal-rss/interests.md` and `personal-rss/following.md` from your vault folder.
+2. Fetch all RSS feeds in parallel (`fast-xml-parser`).
+3. Fetch each article's HTML, strip tags to text (~4KB excerpt per item).
+4. One Anthropic Claude Sonnet call with the interests + the items + a brief-writer prompt.
+5. Write `personal-rss/daily/<today>.md`.
 
-If you're building anything personal-knowledge-shaped, read [gBrain](https://github.com/garrytan/gbrain) first.
+No queue, no database, no plugin, no MCP server, no inline worker. See [`docs/SPEC.md`](./docs/SPEC.md) for the contract.
+
+## Install
+
+```bash
+git clone https://github.com/alextnetto/gbrain-personal-rss
+cd gbrain-personal-rss
+bun install
+export ANTHROPIC_API_KEY=sk-ant-...
+export PERSONAL_RSS_VAULT=/path/to/your/vault   # contains personal-rss/ folder
+bun run daily
+```
+
+Requirements: Bun ≥ 1.3.10, an Anthropic API key, a folder with `personal-rss/interests.md` + `personal-rss/following.md`.
+
+## Vault layout
+
+```
+<your-vault>/personal-rss/
+├── interests.md         ← free text — what you care about
+├── following.md         ← one feed per line: <rss-url> - <description>
+└── daily/
+    └── 2026-05-16.md    ← today's brief (written by the script)
+```
+
+That's it. Plain markdown. Edit in Obsidian (or anything else).
 
 ## How it compares
 
 | | Heterogeneous sources | Audio transcription | Per-user taste model | Segment-level recs | Archive re-surfacing |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| **`gbrain-personal-rss`** [^1] | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **`gbrain-personal-rss`** v0.2 | partial (text/RSS) | — | ✅ | — | — |
 | Snipd | Audio only | ✅ | — | ✅ | — |
 | Readwise Reader | Text only | — | — | — | ✅ |
 | Feedly + Leo | Text only | — | ✅ | — | — |
 | Folo | ✅ | — | — | — | — |
-| Pocket | — | — | — | — | — (shut down Jul 2025) |
-| Omnivore | — | — | — | — | — (shut down Nov 2024) |
+| Pocket | — | — | — | — | shut down Jul 2025 |
+| Omnivore | — | — | — | — | shut down Nov 2024 |
 
-[^1]: Marked as the design target. This is what the hackathon build is aiming at end-to-end; not all five legs are wired up yet.
-
-## Install
-
-Requires [gBrain](https://github.com/garrytan/gbrain) v0.35.1.0+ cloned + bun-linked, and Bun ≥ 1.3.10.
-
-```bash
-# gBrain side (if not already)
-git clone https://github.com/garrytan/gbrain && cd gbrain && bun install && bun link
-
-# this side
-git clone https://github.com/alextnetto/gbrain-personal-rss
-cd gbrain-personal-rss
-./install.sh /path/to/your/gbrain
-```
-
-The installer:
-- `bun link gbrain` so the orchestrator can `import { … } from 'gbrain'`
-- symlinks our skill into your gBrain checkout
-- registers the plugin via `GBRAIN_PLUGIN_PATH` (writes to `~/.gbrainrc`)
-- generates a launchd plist (macOS) for nightly runs
-- runs `scripts/smoke.sh`
-
-## Usage
-
-**In Claude Desktop** (with gBrain's MCP server connected):
-
-- "Add this YouTube channel to my feed: https://www.youtube.com/@AnthropicAI"
-- "What should I read today?"
-- "Show me last Tuesday's brief"
-- "I'm also into WebAssembly toolchains now, update my interests"
-- "List my current subscriptions"
-
-**Manual brief run:** `bun run daily` (or the launchd plist runs `bin/personal-rss-daily` at 6 AM local).
-
-**Web view:** `bun run web`, then visit http://127.0.0.1:7777.
-
-Briefs are written to `briefs/<YYYY-MM-DD>.md` inside your brain.
-
-## Roadmap
-
-### Hackathon (May 2026)
-
-- [ ] Subscription model: podcasts, RSS, YouTube channels, X accounts
-- [ ] Daily ingest worker on gBrain Minions
-- [ ] Transcription pipeline (audio → timestamped chunks)
-- [ ] Per-user taste model — stated interests + interaction history
-- [ ] LLM scoring + ranking per item
-- [ ] Segment-level recommendation output (start/end timestamps, paragraph spans)
-- [ ] Daily brief delivery via MCP
-- [ ] Demo: Garry Tan's actual feeds, end-to-end
-
-### Next
-
-- Read/listen receipts feeding back into the taste model
-- Cross-user signal opt-in ("people with taste similar to yours also flagged this")
-- Browser extension for one-click subscribe from any source
-- Email/Slack/Telegram delivery in addition to MCP
-
-### Maybe later
-
-- Open marketplace of curated source bundles
-- Audio re-mixing — auto-generated "your personalized 25-minute podcast" stitched from the day's best segments
-- Self-hosted Whisper for cost-sensitive deployments
+The whole-product vision (audio transcription, segment-level recs, archive re-surfacing) is real but **not in v0.2**. See [`docs/PLAN.md`](./docs/PLAN.md) for what's next.
 
 ## Hackathon context
 
-Built for the Y Combinator hackathon in May 2026, on top of [gBrain](https://github.com/garrytan/gbrain) — Garry Tan's open-source personal-knowledge framework. The intended demo user is **Garry himself**: feeds wired to his podcast, his X timeline, and his subscriptions. Building a polished public skillpack on Garry's own framework at his own hackathon is the move.
+Built for the Y Combinator hackathon in May 2026. Designed to coexist cleanly with a [gBrain](https://github.com/garrytan/gbrain)-managed Obsidian vault — the brief lands in `personal-rss/daily/`, which gBrain's storage tiering treats as user-edited tracked content. A future v1.0 will integrate properly as a gBrain plugin with MCP delivery; v0.2 ships first.
 
 ## License
 
 [MIT](./LICENSE) © 2026 Alex Netto
-
-## Acknowledgements
-
-- **Garry Tan** and the [gBrain](https://github.com/garrytan/gbrain) project — every hard part of this product was already solved upstream.

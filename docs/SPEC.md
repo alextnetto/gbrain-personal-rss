@@ -1,33 +1,36 @@
-# `gbrain-personal-rss` — Spec (v2, minimal)
+# Spec — v0.2 (working)
 
-A daily AI-filtered content brief, in your Obsidian vault. Demo-grade: simple, happy-path, reliable.
+A daily AI-filtered content brief written to a folder in your Obsidian vault. One script, one Anthropic call per day, no infrastructure.
 
 ---
 
 ## Files
 
-User edits 2 files in `personal-rss/`:
+User edits 2 files in `<vault>/personal-rss/`:
 
 - `interests.md` — free text. What you care about.
-- `following.md` — one URL per line: `<url> - <description>`. URLs are RSS/Atom feeds.
+- `following.md` — one feed per line: `<rss-url> - <description>`.
 
-The orchestrator writes 1 file:
+The script writes 1 file per run:
 
-- `daily/<YYYY-MM-DD>.md` — today's brief.
+- `<vault>/personal-rss/daily/<YYYY-MM-DD>.md` — today's brief.
 
-No frontmatter on any file. No `seen.md`. No `inbox.md`. No `media/` pages. Re-running the same day re-writes the brief (idempotent).
+That's the entire surface.
 
 ---
 
-## Flow (5 steps)
+## Flow
 
-1. Read `interests.md` and `following.md`.
-2. For each URL in `following.md`, fetch the feed and parse items from the last 24 hours.
-3. For each item, fetch the article HTML (skip on error).
-4. Pass `{interests, items[]}` to a single `brief` subagent.
-5. Subagent emits the brief markdown; orchestrator writes `daily/<date>.md`.
+```
+1. Read <vault>/personal-rss/interests.md
+2. Read <vault>/personal-rss/following.md → list of {url, description}
+3. Fetch all RSS feeds in parallel
+4. Fetch all recent articles (last 7 days) in parallel; strip HTML to text
+5. Call Anthropic Claude Sonnet with: interests + items + a prompt that says "pick 4–6 most relevant, write a markdown brief"
+6. Write the brief to <vault>/personal-rss/daily/<today>.md
+```
 
-That's it.
+One script. Top-to-bottom. No queue, no DB, no plugin, no MCP, no worker.
 
 ---
 
@@ -37,28 +40,29 @@ That's it.
 # Daily Brief — YYYY-MM-DD
 
 ## [Title](url) — N min read
-One-sentence why this matters to you.
-> A few sentences quoted from the article.
+One sentence why this matters given the user's interests.
+> A few sentences quoted from the article body.
 
-## [Title](url) — N min read
-…
+## [Title 2](url) — N min read
+...
 ```
 
-Subagent picks 4–6 items max. No archive section. No inbox section. No deep-link timestamps. No frontmatter.
+4–6 items max. If fewer meet the bar: `_(slim day — only N items met the bar)_`. No frontmatter, no archive section, no inbox section, no deep-link timestamps.
 
 ---
 
 ## Content types
 
-| Type | Status |
+| Source | Status |
 |---|---|
-| HTML articles via RSS/Atom feeds | ✅ works |
-| Substack (uses `<root>/feed`) | ✅ works (feed URL form) |
-| YouTube videos | 🚧 later |
-| Audio podcasts | 🚧 later |
-| PDFs | 🚧 later |
+| RSS/Atom feeds of HTML articles | ✅ works |
+| Substack (use `<root>/feed`) | ✅ works |
+| Hacker News RSS | ✅ works |
+| YouTube channels (Atom feed) | 🚧 fetched but no transcript — body is the watch-page HTML stripped, which is junk |
+| Audio podcasts | 🚧 fetched but no transcription |
+| arXiv (Atom feed of abstracts) | ✅ abstracts only; full PDF roadmap |
 
-User puts feed URLs directly in `following.md`. No auto-discovery for v2 minimal — paste the feed URL, not the site URL.
+User puts feed URLs directly in `following.md`. No site→feed auto-discovery.
 
 ---
 
@@ -66,21 +70,32 @@ User puts feed URLs directly in `following.md`. No auto-discovery for v2 minimal
 
 | Failure | Behavior |
 |---|---|
-| Feed 404/5xx | Skip that source, log, continue |
-| Article 404 | Skip that item, continue |
-| Subagent returns non-markdown | Write a fallback brief: title + plain list of fetched item titles + URLs |
-| Subagent throws | Same fallback |
+| Feed 404/timeout | `Promise.allSettled` — skip, log, continue with others |
+| Article 404 / network error / TLS error | Per-item try/catch — skip, log, continue |
+| Anthropic call fails | Script exits with the SDK error; no brief written |
+| `interests.md` or `following.md` missing | Script throws with a clear path |
 
 ---
 
-## Out of scope (intentionally cut)
+## Runtime + cost
 
-- Inbox / one-off saves
-- Archive re-surfacing
-- `seen.md` dedup log
-- Persisted item pages in `media/`
-- Brief frontmatter / item frontmatter
-- YouTube / audio / video / PDF
-- Per-source scoring detail
-- Multi-user
-- Auto-discover feeds from site URLs
+- Total wall-clock: ~30 seconds for 3 feeds × ~6 articles each
+- Cost: one Claude Sonnet call, ~50K input tokens, ~1K output tokens = roughly $0.15 per run
+
+---
+
+## Environment
+
+```
+ANTHROPIC_API_KEY      required
+PERSONAL_RSS_VAULT     path to vault root (default hardcoded; override per machine)
+PERSONAL_RSS_MODEL     anthropic model id (default: claude-sonnet-4-5)
+```
+
+---
+
+## Out of scope (intentionally cut from v0.2)
+
+Inbox / one-off saves · archive re-surfacing · seen-log dedup · YouTube transcription · audio podcast transcription · PDF extraction · MCP delivery · gBrain library integration · per-source item persistence · multi-user · web view.
+
+Most of these are real features. None are needed for the demo. The whole flow is 150 lines of TypeScript + one Anthropic call.

@@ -1,23 +1,18 @@
 {
   "name": "gbrain-personal-rss",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": { "bun": ">=1.3.10" },
   "scripts": {
     "test": "bun test",
-    "web": "bun run web/server.ts",
-    "daily": "bun run bin/personal-rss-daily.ts",
-    "typecheck": "bun --bun tsc --noEmit"
+    "daily": "bun run bin/daily.ts"
   },
   "dependencies": {
-    "express": "^5.0.0",
-    "fast-xml-parser": "^4.4.0",
-    "marked": "^14.0.0",
-    "gray-matter": "^4.0.3"
+    "@anthropic-ai/sdk": "^0.30.0",
+    "fast-xml-parser": "^4.4.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/bun": "latest",
     "typescript": "^5.5.0"
   }
