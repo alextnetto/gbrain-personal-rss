@@ -1,8 +1,30 @@
 {
   "name": "gbrain-personal-rss",
   "version": "0.2.0",
+  "description": "Your personal content firehose, AI-filtered to what actually matters. A gbrain skillpack.",
   "private": true,
   "type": "module",
+  "license": "MIT",
+  "author": "Alex Netto <alex@blockful.io>",
+  "homepage": "https://github.com/alextnetto/gbrain-personal-rss",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alextnetto/gbrain-personal-rss.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alextnetto/gbrain-personal-rss/issues"
+  },
+  "keywords": [
+    "rss",
+    "personal-rss",
+    "ai-agent",
+    "daily-brief",
+    "gbrain",
+    "mcp",
+    "obsidian",
+    "claude",
+    "content-curation"
+  ],
   "engines": { "bun": ">=1.3.10" },
   "scripts": {
     "test": "bun test",
