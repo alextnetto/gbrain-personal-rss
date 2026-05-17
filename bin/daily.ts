@@ -246,9 +246,17 @@ async function main() {
   writeFileSync(outPath, briefMd);
   console.log(`[daily] wrote ${outPath} (${briefMd.length} chars)`);
 
-  // 6. Clear inbox of URLs we successfully fetched (skip on backfill — preserves the
-  // user's inbox state across historical runs).
+  // 6. Move processed inbox URLs → seen.md, then clear them from inbox.md.
+  //    Skip on backfill (preserves user's inbox state across historical runs).
   if (!isBackfill && inboxUrlsFetched.size > 0) {
+    // 6a. Append to seen.md (one URL per line, with a date comment for context).
+    const seenPath = join(PERSONAL_RSS, "seen.md");
+    const seenBefore = existsSync(seenPath) ? readFileSync(seenPath, "utf8") : "";
+    const seenLines = Array.from(inboxUrlsFetched).map((u) => `${u}  # ${todayStr}`);
+    const seenAfter = (seenBefore.replace(/\s+$/, "") + (seenBefore.trim() ? "\n" : "") + seenLines.join("\n") + "\n").replace(/^\n+/, "");
+    writeFileSync(seenPath, seenAfter);
+
+    // 6b. Remove processed URLs from inbox.md.
     const keep: string[] = [];
     const original = existsSync(inboxPath) ? readFileSync(inboxPath, "utf8") : "";
     for (const raw of original.split(/\r?\n/)) {
@@ -261,8 +269,9 @@ async function main() {
     }
     const newBody = keep.length ? keep.join("\n") + "\n" : "";
     writeFileSync(inboxPath, newBody);
-    console.log(`[daily] cleared ${inboxUrlsFetched.size} URL(s) from inbox` +
-      (inboxUrlsFailed.size > 0 ? `; ${inboxUrlsFailed.size} kept (fetch failed)` : ""));
+
+    console.log(`[daily] moved ${inboxUrlsFetched.size} URL(s) inbox → seen` +
+      (inboxUrlsFailed.size > 0 ? `; ${inboxUrlsFailed.size} kept in inbox (fetch failed)` : ""));
   }
 }
 

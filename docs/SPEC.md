@@ -12,11 +12,13 @@ User edits 3 files in `<vault>/personal-rss/`:
 - `following.md` — one feed per line: `<rss-url> - <description>`.
 - `inbox.md` — one URL per line. One-off saves; **always** show up in the next brief.
 
-The script writes 1 file per run:
+The script writes/updates these per run:
 
-- `<vault>/personal-rss/daily/<YYYY-MM-DD>.md` — today's brief.
+- `<vault>/personal-rss/daily/<YYYY-MM-DD>.md` — the brief (written fresh each run).
+- `<vault>/personal-rss/seen.md` — append-only log of inbox URLs that have been processed. Each line: `<url>  # <YYYY-MM-DD>`.
+- `<vault>/personal-rss/inbox.md` — URLs that successfully fetched are removed (those that failed stay so the user can investigate).
 
-And, on a successful run, it **clears `inbox.md`** of URLs it successfully fetched (URLs that failed to fetch stay so the user can investigate). Backfill runs (`PERSONAL_RSS_DATE` set) do NOT touch inbox.
+Backfill runs (`PERSONAL_RSS_DATE` set) do NOT touch `inbox.md` or `seen.md`.
 
 That's the entire surface.
 
