@@ -6,14 +6,17 @@ A daily AI-filtered content brief written to a folder in your Obsidian vault. On
 
 ## Files
 
-User edits 2 files in `<vault>/personal-rss/`:
+User edits 3 files in `<vault>/personal-rss/`:
 
 - `interests.md` — free text. What you care about.
 - `following.md` — one feed per line: `<rss-url> - <description>`.
+- `inbox.md` — one URL per line. One-off saves; **always** show up in the next brief.
 
 The script writes 1 file per run:
 
 - `<vault>/personal-rss/daily/<YYYY-MM-DD>.md` — today's brief.
+
+And, on a successful run, it **clears `inbox.md`** of URLs it successfully fetched (URLs that failed to fetch stay so the user can investigate). Backfill runs (`PERSONAL_RSS_DATE` set) do NOT touch inbox.
 
 That's the entire surface.
 
@@ -22,12 +25,13 @@ That's the entire surface.
 ## Flow
 
 ```
-1. Read <vault>/personal-rss/interests.md
-2. Read <vault>/personal-rss/following.md → list of {url, description}
-3. Fetch all RSS feeds in parallel
-4. Fetch all recent articles (last 7 days) in parallel; strip HTML to text
-5. Call Anthropic Claude Sonnet with: interests + items + a prompt that says "pick 4–6 most relevant, write a markdown brief"
-6. Write the brief to <vault>/personal-rss/daily/<today>.md
+1. Read <vault>/personal-rss/{interests,following,inbox}.md
+2. Fetch all RSS feeds in parallel; keep items in the 24h window for the brief date
+3. In parallel: fetch each feed article's body + fetch each inbox URL's body
+4. Call Anthropic Claude Sonnet with: interests + items (inbox-flagged first) +
+   a prompt that says "always include inbox items, then pick 3–5 best feed items"
+5. Write the brief to <vault>/personal-rss/daily/<today>.md
+6. Clear from inbox.md every URL that successfully fetched (unless backfill mode)
 ```
 
 One script. Top-to-bottom. No queue, no DB, no plugin, no MCP, no worker.
@@ -94,8 +98,8 @@ PERSONAL_RSS_MODEL     anthropic model id (default: claude-sonnet-4-5)
 
 ---
 
-## Out of scope (intentionally cut from v0.2)
+## Out of scope (intentionally cut)
 
-Inbox / one-off saves · archive re-surfacing · seen-log dedup · YouTube transcription · audio podcast transcription · PDF extraction · MCP delivery · gBrain library integration · per-source item persistence · multi-user · web view.
+Archive re-surfacing · seen-log dedup · YouTube transcription · audio podcast transcription · PDF extraction · MCP delivery · gBrain library integration · per-source item persistence · multi-user · web view.
 
-Most of these are real features. None are needed for the demo. The whole flow is 150 lines of TypeScript + one Anthropic call.
+Most of these are real features. None are needed for the demo.
